@@ -1,0 +1,68 @@
+# Build stage
+FROM node:16-alpine as builder
+
+WORKDIR /app
+
+# Copy package files
+COPY backend/package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY backend/ ./
+
+# Build TypeScript
+RUN npm run build
+
+# Python stage for T5 model
+FROM python:3.8-slim as python-builder
+
+WORKDIR /app
+
+# Copy Python requirements
+COPY backend/requirements.txt ./
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy T5 model setup script
+COPY backend/src/scripts/setup_t5.py ./scripts/
+RUN mkdir -p models/t5
+RUN python scripts/setup_t5.py --model_dir models/t5 --model_size t5-base
+
+# Production stage
+FROM node:16-alpine
+
+WORKDIR /app
+
+# Install Python
+RUN apk add --no-cache python3 py3-pip
+
+# Copy built Node.js files
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/package*.json ./
+
+# Copy Python environment and T5 model
+COPY --from=python-builder /usr/local/lib/python3.8/site-packages /usr/local/lib/python3.8/site-packages
+COPY --from=python-builder /app/models ./models
+
+# Install production dependencies
+RUN npm ci --only=production
+
+# Environment variables
+ENV NODE_ENV=production
+ENV PORT=3001
+
+# Create necessary directories
+RUN mkdir -p logs uploads
+
+# Expose port
+EXPOSE 3001
+
+# Start the server
+CMD ["node", "dist/index.js"]
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD wget -qO- http://localhost:3001/health || exit 1
