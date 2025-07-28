@@ -34,14 +34,11 @@ const EditorComponent: React.FC<EditorProps> = ({ onSave, onRequestSuggestions }
   const [saveFormat, setSaveFormat] = useState<'txt' | 'pdf' | 'docx'>('txt');
   const floatingBtnRef = useRef<HTMLButtonElement>(null);
 
-  // Selection state for floating button
   const [selection, setSelection] = useState<Range | null>(null);
 
-  // Color/Highlight state for toolbar color pickers
   const [currentColor, setCurrentColor] = useState('#222');
   const [currentHighlight, setCurrentHighlight] = useState('#fff');
 
-  // Formatting toolbar actions
   const toggleFormat = (format: string) => {
     const isActive = isFormatActive(editor, format);
     Transforms.setNodes(
@@ -81,7 +78,6 @@ const EditorComponent: React.FC<EditorProps> = ({ onSave, onRequestSuggestions }
     );
   };
 
-  // Save logic
   const handleSave = async () => {
     setShowSaveModal(true);
   };
@@ -99,7 +95,6 @@ const EditorComponent: React.FC<EditorProps> = ({ onSave, onRequestSuggestions }
     setShowSaveModal(false);
   };
 
-  // AI Suggestions logic
   const handleGetSuggestions = useCallback(async () => {
     const text = SlateEditorToPlainText(value);
     if (!onRequestSuggestions || isLoading || !text.trim()) return;
@@ -130,7 +125,6 @@ const EditorComponent: React.FC<EditorProps> = ({ onSave, onRequestSuggestions }
     setSuggestions(prev => prev.filter(s => s.id !== id));
   }, []);
 
-  // Floating button for selection
   const renderFloatingButton = () => {
     if (!selection || Range.isCollapsed(selection)) return null;
     const domRange = ReactEditor.toDOMRange(editor, selection);
@@ -140,7 +134,7 @@ const EditorComponent: React.FC<EditorProps> = ({ onSave, onRequestSuggestions }
         ref={floatingBtnRef}
         style={{
           position: 'absolute',
-          top: rect.top + window.scrollY - 100, // Move button above selection
+          top: rect.top + window.scrollY - 100, 
           left: rect.left + window.scrollX,
           zIndex: 100,
           background: '#007bff',
@@ -163,7 +157,6 @@ const EditorComponent: React.FC<EditorProps> = ({ onSave, onRequestSuggestions }
     );
   };
 
-  // Toolbar component
   const Toolbar = () => (
     <div className="editor-toolbar">
       <button onClick={handleSave} className="toolbar-button">
@@ -301,7 +294,6 @@ const EditorComponent: React.FC<EditorProps> = ({ onSave, onRequestSuggestions }
   );
 };
 
-// Helper functions
 function isFormatActive(editor: Editor, format: string) {
   const [match] = Array.from(Editor.nodes(editor, {
     match: (n: Node) => !!(n as any)[format],
