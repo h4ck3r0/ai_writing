@@ -20,6 +20,78 @@ const validateSuggestionRequest = [
     .withMessage('Invalid format specified')
 ];
 
+// Add below existing routes in backend/src/routes/ai.ts
+
+router.post('/theme-consistency', async (req, res) => {
+  const { content } = req.body;
+  const suggestions = await AIService.analyzeThemeConsistency(content);
+  res.json({ success: true, data: { suggestions } });
+});
+
+router.post('/foreshadowing', async (req, res) => {
+  const { content } = req.body;
+  const suggestions = await AIService.detectForeshadowing(content);
+  res.json({ success: true, data: { suggestions } });
+});
+
+router.post('/motivation-stakes', async (req, res) => {
+  const { content } = req.body;
+  const suggestions = await AIService.analyzeMotivationStakes(content);
+  res.json({ success: true, data: { suggestions } });
+});
+
+router.post('/scene-breakdown', async (req, res) => {
+  const { content } = req.body;
+  const suggestions = await AIService.analyzeSceneBreakdown(content);
+  res.json({ success: true, data: { suggestions } });
+});
+
+router.post('/genre-cliches', async (req, res) => {
+  const { content, genre } = req.body;
+  const suggestions = await AIService.detectGenreCliches(content, genre);
+  res.json({ success: true, data: { suggestions } });
+});
+
+router.post('/audience-tone', async (req, res) => {
+  const { content, audience } = req.body;
+  const suggestions = await AIService.matchAudienceTone(content, audience);
+  res.json({ success: true, data: { suggestions } });
+});
+// Entity extraction endpoint using T5
+router.post('/entities', async (req: Request, res: Response) => {
+  const { content } = req.body;
+  if (!content || typeof content !== 'string' || content.length < 1) {
+    return res.status(400).json({ success: false, error: 'Content is required' });
+  }
+  try {
+    // Import T5Service and run NER
+    const { T5Service } = require('../services/T5Service');
+    const t5 = new T5Service();
+    const entities = await t5.extractEntities(content);
+    res.json({ success: true, entities });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Entity extraction failed', details: error.message });
+  }
+});
+
+router.post('/revision-history', async (req, res) => {
+  const { content, previousDraft } = req.body;
+  const suggestions = await AIService.reviewRevisionHistory(content, previousDraft);
+  res.json({ success: true, data: { suggestions } });
+});
+
+router.post('/interactive-qa', async (req, res) => {
+  const { content, question } = req.body;
+  const suggestions = await AIService.interactiveQA(content, question);
+  res.json({ success: true, data: { suggestions } });
+});
+
+router.post('/title-logline', async (req, res) => {
+  const { content } = req.body;
+  const suggestions = await AIService.suggestTitleLogline(content);
+  res.json({ success: true, data: { suggestions } });
+});
+
 /**
  * POST /api/ai/suggestions
  * Get AI suggestions for the provided content
@@ -169,6 +241,17 @@ router.get('/health', async (_req: Request, res: Response) => {
         code: error.code
       }
     });
+  }
+});
+
+// Legacy-compatible endpoint for frontend
+router.post('/analyze-theme', async (req, res) => {
+  const { content } = req.body;
+  try {
+    const suggestions = await AIService.analyzeThemeConsistency(content);
+    res.json({ success: true, data: { suggestions } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

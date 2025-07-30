@@ -11,6 +11,7 @@ interface EditorProps {
   onSave?: (content: string) => Promise<void>;
   onRequestSuggestions?: (content: string) => Promise<AISuggestion[]>;
 }
+type CustomText = Text & { entityType?: string };
 
 type CustomElement = { type: string; children: Descendant[] };
 
@@ -26,7 +27,6 @@ const EditorComponent: React.FC<EditorProps> = ({ onSave, onRequestSuggestions }
   const [value, setValue] = useState<Descendant[]>(initialValue);
   const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showAIFeatures, setShowAIFeatures] = useState(false);
   const [aiFeaturesContent, setAIFeaturesContent] = useState('');
   const [showSuggestionsPanel, setShowSuggestionsPanel] = useState(false);
@@ -34,11 +34,14 @@ const EditorComponent: React.FC<EditorProps> = ({ onSave, onRequestSuggestions }
   const [saveFormat, setSaveFormat] = useState<'txt' | 'pdf' | 'docx'>('txt');
   const floatingBtnRef = useRef<HTMLButtonElement>(null);
 
+  // Selection state for floating button
   const [selection, setSelection] = useState<Range | null>(null);
 
+  // Color/Highlight state for toolbar color pickers
   const [currentColor, setCurrentColor] = useState('#222');
   const [currentHighlight, setCurrentHighlight] = useState('#fff');
 
+  // Formatting toolbar actions
   const toggleFormat = (format: string) => {
     const isActive = isFormatActive(editor, format);
     Transforms.setNodes(
@@ -67,10 +70,12 @@ const EditorComponent: React.FC<EditorProps> = ({ onSave, onRequestSuggestions }
   };
 
   const applyHeading = (level: number | null) => {
+    if (!editor.selection) return;
     Transforms.setNodes<SlateElement>(
       editor,
       { type: level ? `heading${level}` : 'paragraph' } as Partial<SlateElement>,
       {
+        at: editor.selection,
         match: (n: Node) =>
           SlateElement.isElement(n) &&
           Editor.isBlock(editor, n)
@@ -78,6 +83,107 @@ const EditorComponent: React.FC<EditorProps> = ({ onSave, onRequestSuggestions }
     );
   };
 
+  // Entity detection state
+  const [entities, setEntities] = useState<any[]>([]);
+
+  // Entity detection API call
+  const detectEntities = useCallback(async (text: string) => {
+    try {
+      const response = await fetch('/api/entities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: text })
+      });
+      const data = await response.json();
+      setEntities(data.entities || []);
+    } catch (err) {
+      setEntities([]);
+    }
+  }, []);
+
+  // Update entities when editor value changes
+  React.useEffect(() => {
+    const plainText = SlateEditorToPlainText(value);
+    if (plainText.trim().length > 0) {
+      detectEntities(plainText);
+    } else {
+      setEntities([]);
+    }
+  }, [value, detectEntities]);
+// Auto-apply entityType to matching Slate text nodes
+React.useEffect(() => {
+  if (!entities.length || !editor) return;
+  let offset = 0;
+  const nodesWithOffsets: { node: Text; path: any; start: number; end: number }[] = [];
+  for (const [node, path] of Node.texts(editor)) {
+    const text = node.text;
+    nodesWithOffsets.push({
+      node,
+      path,
+      start: offset,
+      end: offset + text.length
+    });
+    offset += text.length;
+  }
+  entities.forEach(entity => {
+    nodesWithOffsets.forEach(({ node, path, start, end }) => {
+      if (entity.start < end && entity.end > start) {
+        Transforms.setNodes(
+          editor,
+          { entityType: entity.type } as Partial<CustomText>,
+          { at: path, match: n => Text.isText(n), split: true }
+        );
+      }
+    });
+  });
+}, [entities, editor, value]);
+
+  // Custom rendering for entity coloring
+  const renderLeaf = useCallback((props: any) => {
+    let { attributes, children, leaf } = props;
+    if (leaf.entityType) {
+      switch (leaf.entityType) {
+        case 'name':
+          children = <span className="entity-name">{children}</span>;
+          break;
+        case 'place':
+          children = <span className="entity-place">{children}</span>;
+          break;
+        case 'organization':
+          children = <span className="entity-organization">{children}</span>;
+          break;
+        case 'date':
+          children = <span className="entity-date">{children}</span>;
+          break;
+        case 'event':
+          children = <span className="entity-event">{children}</span>;
+          break;
+        case 'product':
+          children = <span className="entity-product">{children}</span>;
+          break;
+        default:
+          break;
+      }
+    }
+    if (leaf.bold) {
+      children = <strong>{children}</strong>;
+    }
+    if (leaf.italic) {
+      children = <em>{children}</em>;
+    }
+    if (leaf.underline) {
+      children = <u>{children}</u>;
+    }
+    if (leaf.color) {
+      children = <span style={{ color: leaf.color }}>{children}</span>;
+    }
+    if (leaf.highlight) {
+      children = <span style={{ background: leaf.highlight }}>{children}</span>;
+    }
+    return <span {...attributes}>{children}</span>;
+  }, []);
+
+  // Save logic
   const handleSave = async () => {
     setShowSaveModal(true);
   };
@@ -95,22 +201,23 @@ const EditorComponent: React.FC<EditorProps> = ({ onSave, onRequestSuggestions }
     setShowSaveModal(false);
   };
 
+  // AI Suggestions logic
   const handleGetSuggestions = useCallback(async () => {
     const text = SlateEditorToPlainText(value);
     if (!onRequestSuggestions || isLoading || !text.trim()) return;
     setIsLoading(true);
-    setError(null);
+    // setError(null); // removed unused error state
     try {
       const newSuggestions = await onRequestSuggestions(text);
       if (Array.isArray(newSuggestions)) {
         setSuggestions(newSuggestions);
         setShowSuggestionsPanel(true);
-        if (newSuggestions.length === 0) setError('No suggestions available');
+        // if (newSuggestions.length === 0) setError('No suggestions available');
       } else {
-        setError('Failed to get suggestions');
+        // setError('Failed to get suggestions');
       }
     } catch (error) {
-      setError('Failed to get suggestions');
+      // setError('Failed to get suggestions');
     } finally {
       setIsLoading(false);
     }
@@ -134,16 +241,9 @@ const EditorComponent: React.FC<EditorProps> = ({ onSave, onRequestSuggestions }
         ref={floatingBtnRef}
         style={{
           position: 'absolute',
-          top: rect.top + window.scrollY - 100, 
+          top: rect.top + window.scrollY - 50,
           left: rect.left + window.scrollX,
-          zIndex: 100,
-          background: '#007bff',
-          color: '#fff',
-          border: 'none',
-          borderRadius: '6px',
-          padding: '6px 14px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-          cursor: 'pointer'
+          zIndex: 1000,
         }}
         onClick={() => {
           const selectedText = Editor.string(editor, selection);
@@ -157,53 +257,81 @@ const EditorComponent: React.FC<EditorProps> = ({ onSave, onRequestSuggestions }
     );
   };
 
+  // Helper to get current block type for dropdown
+  const getCurrentBlockType = () => {
+    if (!editor.selection) return '';
+    const [match] = Array.from(
+      Editor.nodes(editor, {
+        at: editor.selection,
+        match: n =>
+          SlateElement.isElement(n) &&
+          Editor.isBlock(editor, n),
+      })
+    );
+    if (match) {
+      const [node] = match;
+      // Use type assertion to CustomElement to access 'type'
+      const element = node as { type?: string };
+      if (element.type && typeof element.type === 'string' && element.type.startsWith('heading')) {
+        return element.type.replace('heading', '');
+      }
+      return '';
+    }
+    return '';
+  };
+
   const Toolbar = () => (
     <div className="editor-toolbar">
-      <button onClick={handleSave} className="toolbar-button">
-        Save
+      <button onClick={handleSave} className="toolbar-button" title="Save">
+        💾
       </button>
       <button
         onClick={handleGetSuggestions}
         className="toolbar-button"
+        title="Get AI Suggestions"
       >
-        {isLoading ? 'Getting Suggestions...' : 'Get AI Suggestions'}
+        {isLoading ? '⏳' : '💡'}
       </button>
       <button
         onClick={() => { setShowAIFeatures(true); setAIFeaturesContent(SlateEditorToPlainText(value)); }}
         className="toolbar-button"
         style={{ background: '#007bff', color: '#fff', marginLeft: '8px' }}
+        title="AI Features"
       >
-        AI Features
+        🤖
       </button>
       <select
         onChange={e => applyHeading(e.target.value ? Number(e.target.value) : null)}
-        defaultValue=""
-        style={{ padding: '4px 8px', borderRadius: '4px' }}
+        value={getCurrentBlockType()}
+        style={{ padding: '4px 8px', borderRadius: '4px', width: 40 }}
+        title="Heading"
       >
-        <option value="">Normal</option>
-        <option value={1}>Heading 1</option>
-        <option value={2}>Heading 2</option>
-        <option value={3}>Heading 3</option>
-        <option value={4}>Heading 4</option>
-        <option value={5}>Heading 5</option>
-        <option value={6}>Heading 6</option>
+        <option value="">¶</option>
+        <option value={1}>H1</option>
+        <option value={2}>H2</option>
+        <option value={3}>H3</option>
+        <option value={4}>H4</option>
+        <option value={5}>H5</option>
+        <option value={6}>H6</option>
       </select>
-      <button onClick={() => toggleFormat('bold')}>Bold</button>
-      <button onClick={() => toggleFormat('italic')}>Italic</button>
-      <button onClick={() => toggleFormat('underline')}>Underline</button>
-      <span style={{ marginLeft: 8 }}>Text Color:</span>
+      <button onClick={() => toggleFormat('bold')} title="Bold">𝐁</button>
+      <button onClick={() => toggleFormat('italic')} title="Italic"><span style={{ fontStyle: 'italic' }}>I</span></button>
+      <button onClick={() => toggleFormat('underline')} title="Underline"><span style={{ textDecoration: 'underline' }}>U</span></button>
+      <span style={{ marginLeft: 8 }} title="Text Color">🎨</span>
       <input
         type="color"
         value={currentColor}
         onChange={e => setColor(e.target.value)}
-        style={{ verticalAlign: 'middle', marginRight: 8, border: 'none', background: 'none' }}
+        style={{ verticalAlign: 'middle', marginRight: 8, border: 'none', background: 'none', width: 28, height: 28 }}
+        title="Text Color"
       />
-      <span style={{ marginLeft: 8 }}>Highlight:</span>
+      <span style={{ marginLeft: 8 }} title="Highlight">🖍️</span>
       <input
         type="color"
         value={currentHighlight}
         onChange={e => setHighlight(e.target.value)}
-        style={{ verticalAlign: 'middle', marginRight: 8, border: 'none', background: 'none' }}
+        style={{ verticalAlign: 'middle', marginRight: 8, border: 'none', background: 'none', width: 28, height: 28 }}
+        title="Highlight"
       />
     </div>
   );
@@ -212,77 +340,58 @@ const EditorComponent: React.FC<EditorProps> = ({ onSave, onRequestSuggestions }
     <div className="editor-layout">
       <div className="editor-main">
         <Toolbar />
-        <div className="editor-content" style={{ position: 'relative' }}>
-          <Slate
-            editor={editor}
-            initialValue={initialValue}
-            onChange={(val: Descendant[]) => {
+        <Slate
+          editor={editor}
+          initialValue={initialValue}
+          onChange={val => {
+            // Prevent setting empty value (Slate expects at least one node)
+            if (!val || val.length === 0) {
+              setValue(initialValue);
+            } else {
               setValue(val);
-              setSelection(editor.selection);
+            }
+          }}
+        >
+          <Editable
+            className="editor-content"
+            renderLeaf={renderLeaf}
+            renderElement={renderElement}
+            onKeyDown={event => {
+              // Custom key handling if needed
             }}
-          >
-            <Editable
-              renderElement={renderElement}
-              renderLeaf={renderLeaf}
-              placeholder="Start writing your story..."
-              style={{
-                minHeight: '180px',
-                background: '#fff',
-                borderRadius: '0',
-                padding: '16px',
-                border: 'none',
-                fontSize: '17px',
-                boxSizing: 'border-box'
-              }}
-            />
-            {renderFloatingButton()}
-          </Slate>
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
-        </div>
+            onSelect={event => {
+              const selection = editor.selection;
+              setSelection(selection);
+            }}
+          />
+        </Slate>
+        {showAIFeatures && (
+          <AIFeaturesPanel
+            initialContent={aiFeaturesContent}
+            onClose={() => setShowAIFeatures(false)}
+          />
+        )}
         {showSaveModal && (
-          <div className="save-modal">
-            <div style={{ background: '#fff', padding: 24, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
-              <h3>Save As</h3>
-              <select value={saveFormat} onChange={e => setSaveFormat(e.target.value as any)}>
+          <div className="modal">
+            <div className="modal-content">
+              <h3>Save Document</h3>
+              <select
+                value={saveFormat}
+                onChange={e => setSaveFormat(e.target.value as 'txt' | 'pdf' | 'docx')}
+              >
                 <option value="txt">Text (.txt)</option>
                 <option value="pdf">PDF (.pdf)</option>
                 <option value="docx">Word (.docx)</option>
               </select>
-              <div style={{ marginTop: 16 }}>
-                <button onClick={handleDownload} style={{ marginRight: 8 }}>Download</button>
-                <button onClick={() => setShowSaveModal(false)}>Cancel</button>
-              </div>
+              <button onClick={handleDownload}>Download</button>
+              <button onClick={() => setShowSaveModal(false)}>Cancel</button>
             </div>
           </div>
         )}
-        {showAIFeatures && (
-          <AIFeaturesPanel
-            onClose={() => setShowAIFeatures(false)}
-            initialContent={aiFeaturesContent}
-          />
-        )}
+        {renderFloatingButton()}
       </div>
       {showSuggestionsPanel && (
-        <div className="editor-suggestions" style={{ alignSelf: 'stretch' }}>
-          <button
-            style={{
-              position: 'absolute',
-              top: '8px',
-              right: '12px',
-              background: 'none',
-              border: 'none',
-              fontSize: '22px',
-              cursor: 'pointer',
-              color: '#888',
-              zIndex: 10
-            }}
-            onClick={() => setShowSuggestionsPanel(false)}
-            title="Close"
-          >×</button>
+        <div className="editor-suggestions">
           <SuggestionsPanel
             suggestions={suggestions}
             onApply={handleApplySuggestion}
@@ -294,6 +403,7 @@ const EditorComponent: React.FC<EditorProps> = ({ onSave, onRequestSuggestions }
   );
 };
 
+// Helper functions
 function isFormatActive(editor: Editor, format: string) {
   const [match] = Array.from(Editor.nodes(editor, {
     match: (n: Node) => !!(n as any)[format],
@@ -320,26 +430,6 @@ function renderElement(props: any) {
     default:
       return <p {...attributes}>{children}</p>;
   }
-}
-
-function renderLeaf(props: any) {
-  let { attributes, children, leaf } = props;
-  if (leaf.bold) {
-    children = <strong>{children}</strong>;
-  }
-  if (leaf.italic) {
-    children = <em>{children}</em>;
-  }
-  if (leaf.underline) {
-    children = <u>{children}</u>;
-  }
-  if (leaf.color) {
-    children = <span style={{ color: leaf.color }}>{children}</span>;
-  }
-  if (leaf.highlight) {
-    children = <span style={{ background: leaf.highlight }}>{children}</span>;
-  }
-  return <span {...attributes}>{children}</span>;
 }
 
 function SlateEditorToPlainText(value: Descendant[]) {

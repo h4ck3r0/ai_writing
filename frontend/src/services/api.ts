@@ -9,7 +9,7 @@ import {
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 const MAX_RETRIES = 2;
-const RETRY_DELAY = 1000; 
+const RETRY_DELAY = 1000; // 1 second
 
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   retry?: number;
@@ -20,10 +20,10 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  timeout: 30000
+  timeout: 30000 // 30 seconds
 });
 
-
+// Retry failed requests
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -44,6 +44,7 @@ api.interceptors.response.use(
   }
 );
 
+// Error handling helper
 const handleApiError = (error: unknown) => {
   if (axios.isAxiosError(error)) {
     const axiosError = error as AxiosError<APIResponse<unknown>>;
@@ -80,7 +81,7 @@ export const writingAPI = {
       return response.data.data.suggestions;
     } catch (error) {
       handleApiError(error);
-      return []; 
+      return []; // Return empty array if all retries fail
     }
   },
 
@@ -110,7 +111,7 @@ export const writingAPI = {
 export default {
   writing: writingAPI
 };
-
+// New AI features API object (non-breaking addition)
 export const aiFeaturesApi = {
   analyzeThemeConsistency: (content: string) =>
     api.post('/api/ai/analyze-theme', { content }),

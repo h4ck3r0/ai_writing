@@ -14,7 +14,6 @@ const App: React.FC = () => {
     try {
       setError(null);
       await api.writing.saveContent(content, WritingFormat.NOVEL);
-      // Could show success toast here
     } catch (error) {
       console.error('Failed to save content:', error);
       setError(error instanceof Error ? error.message : 'Failed to save content');
@@ -57,7 +56,7 @@ const App: React.FC = () => {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>AI Writing Platform</h1>
+        <img src="/logo192.png" alt="Logo" style={{ width: 40, height: 40, display: 'block', margin: '0 auto' }} />
       </header>
       <main className="app-main">
         {error && (
@@ -76,5 +75,4 @@ const App: React.FC = () => {
 
 export default App;
 
-{/* Render MainPanel for AI features and suggestions */}
 <MainPanel />

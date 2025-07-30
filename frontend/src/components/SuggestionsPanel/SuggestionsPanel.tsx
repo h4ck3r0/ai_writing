@@ -1,7 +1,6 @@
-import React, { memo, useState } from 'react';
+import React, { memo } from 'react';
 import './SuggestionsPanel.css';
 import { AISuggestion, SuggestionType } from '../../types';
-import AIFeaturesPanel from '../AIFeaturesPanel';
 
 interface SuggestionsPanelProps {
   suggestions: AISuggestion[];
@@ -116,7 +115,7 @@ const SuggestionsPanel: React.FC<SuggestionsPanelProps> = memo(({
   }
 
   return (
-    <div className="suggestions-panel">
+    <div className="editor-suggestions">
       <h3>AI Suggestions ({suggestions.length})</h3>
       <div className="suggestions-list">
         {suggestions.map(suggestion => (

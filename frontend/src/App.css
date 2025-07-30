@@ -21,7 +21,7 @@
 .app-main {
   flex: 1;
   padding: 24px;
-  overflow: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
