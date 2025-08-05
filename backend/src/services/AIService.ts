@@ -1,39 +1,37 @@
-// Add at the top if not present:
+
 import { SuggestionType, WritingFormat, AISuggestion } from '../types';
 import { GeminiService, IGeminiService } from './GeminiService';
 import { T5Service, IT5Service } from './T5Service';
 
 class AIService {
 
-// --- Additional AI Features ---
-// Dialogue rewriting
+rewriting
   async rewriteDialogue(content: string, format: WritingFormat): Promise<AISuggestion[]> {
     const suggestions = await this.getSuggestions(content, format);
     return suggestions.filter(s => s.type === 'DIALOGUE');
   }
 
-  // Genre/style adaptation
+
   async adaptGenre(content: string, genre: string): Promise<AISuggestion[]> {
     const prompt = `${content}\n\nRewrite for genre: ${genre}`;
     const suggestions = await this.getSuggestions(prompt, WritingFormat.NOVEL);
     return suggestions;
   }
 
-  // Character arc analysis
+
   async analyzeCharacterArc(content: string, character: string): Promise<AISuggestion[]> {
     const prompt = `Analyze the arc of character "${character}" in the following:\n${content}`;
     const suggestions = await this.getSuggestions(prompt, WritingFormat.NOVEL);
     return suggestions.filter(s => s.type === 'CHARACTER');
   }
 
-  // Plot hole detection
   async detectPlotHoles(content: string): Promise<AISuggestion[]> {
     const prompt = `Find plot holes or inconsistencies in:\n${content}`;
     const suggestions = await this.getSuggestions(prompt, WritingFormat.NOVEL);
     return suggestions.filter(s => s.type === 'PLOT');
   }
 
-  // Automated summaries
+  
   async summarizeContent(content: string): Promise<AISuggestion[]> {
     const prompt = `Summarize the following content:\n${content}`;
     const suggestions = await this.getSuggestions(prompt, WritingFormat.NOVEL);
@@ -44,55 +42,55 @@ class AIService {
     return await this.getSuggestions(prompt, WritingFormat.NOVEL);
   }
 
-  // Foreshadowing Detection
+
     async detectForeshadowing(content: string): Promise<AISuggestion[]> {
     const prompt = `Detect missed foreshadowing opportunities and suggest narrative hints:\n${content}`;
     return await this.getSuggestions(prompt, WritingFormat.NOVEL);
   }
 
-  // Motivation & Stakes Analysis
+  
   async analyzeMotivationStakes(content: string): Promise<AISuggestion[]> {
     const prompt = `Evaluate character motivations and story stakes, flag unclear or weak elements:\n${content}`;
     return await this.getSuggestions(prompt, WritingFormat.NOVEL);
   }
 
-  // Scene Breakdown & Pacing
+ 
   async analyzeSceneBreakdown(content: string): Promise<AISuggestion[]> {
     const prompt = `Segment content into scenes, assess pacing, and recommend adjustments:\n${content}`;
     return await this.getSuggestions(prompt, WritingFormat.NOVEL);
   }
 
-  // Genre Tropes & Cliché Alerts
+  
   async detectGenreCliches(content: string, genre: string): Promise<AISuggestion[]> {
     const prompt = `Warn about overused tropes/clichés in ${genre} and suggest alternatives:\n${content}`;
     return await this.getSuggestions(prompt, WritingFormat.NOVEL);
   }
 
-  // Audience Tone Matching
+  
   async matchAudienceTone(content: string, audience: string): Promise<AISuggestion[]> {
     const prompt = `Adapt content to match the tone for ${audience} audience:\n${content}`;
     return await this.getSuggestions(prompt, WritingFormat.NOVEL);
   }
 
-  // Revision History AI Review
+  
   async reviewRevisionHistory(content: string, previousDraft: string): Promise<AISuggestion[]> {
     const prompt = `Analyze changes between drafts and recommend targeted improvements:\nPrevious Draft:\n${previousDraft}\nCurrent Draft:\n${content}`;
     return await this.getSuggestions(prompt, WritingFormat.NOVEL);
   }
 
-  // Interactive Q&A
+  
   async interactiveQA(content: string, question: string): Promise<AISuggestion[]> {
     const prompt = `Story:\n${content}\nQuestion:\n${question}\nAnswer as an expert editor:`;
     return await this.getSuggestions(prompt, WritingFormat.NOVEL);
   }
 
-  // AI-powered Title & Logline Suggestions
+  
   async suggestTitleLogline(content: string): Promise<AISuggestion[]> {
     const prompt = `You are an expert story editor. Based on the following content, generate 3 creative titles, 3 loglines, and 1 elevator pitch. Format your response clearly with sections for Title, Logline, and Elevator Pitch:\n${content}`;
     return await this.getSuggestions(prompt, WritingFormat.NOVEL);
   }
 
-  // Cross-format conversion
+  
   async convertFormat(content: string, from: string, to: string): Promise<AISuggestion[]> {
     const prompt = `Convert this from ${from} to ${to} format:\n${content}`;
     let formatEnum: WritingFormat = WritingFormat.NOVEL;
@@ -111,8 +109,7 @@ class AIService {
     }
     const suggestions = await this.getSuggestions(prompt, formatEnum);
     return suggestions;
-  // Theme Consistency Analysis
-
+  
 
 
   }
@@ -179,7 +176,7 @@ class AIService {
       for (const block of blocks) {
         const lines = block.split('\n').map(line => line.trim());
         
-        // Extract suggestion data using flexible matching
+       
         const typeMatch = lines.find(l => /type:/i.test(l))?.match(/type:\s*([^$\n]*)/i);
         const originalMatch = lines.find(l => /original text:/i.test(l))?.match(/original text:\s*([^$\n]*)/i);
         const improvedMatch = lines.find(l => /improved version:/i.test(l))?.match(/improved version:\s*([^$\n]*)/i);
@@ -189,12 +186,11 @@ class AIService {
           const originalText = originalMatch[1].trim();
           const improvedText = improvedMatch[1].trim();
 
-          // Validate suggestion type
           const validType = Object.values(SuggestionType).includes(type as SuggestionType)
             ? type as SuggestionType
             : SuggestionType.STYLE;
 
-          // Find the position of the original text
+          
           const start = originalContent.indexOf(originalText);
           if (start !== -1) {
             const suggestion: AISuggestion = {
@@ -347,7 +343,7 @@ Give 2-3 specific, actionable suggestions.`
     ]);
     let suggestions = [...geminiSuggestions, ...t5Suggestions];
     if (suggestions.length === 0) {
-      // fallback from GeminiService
+      
       suggestions = (this.geminiService as GeminiService).getFallbackSuggestions(content);
     }
     return suggestions
